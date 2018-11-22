@@ -507,6 +507,8 @@ public class DynamicProgramming extends MDPSolver implements ValueFunction, QFun
 	protected double computeQ(State s, ActionTransitions trans){
 		
 		double q = 0.;
+
+		System.out.println("printing in computeQ");
 		
 		if(trans.ga.action instanceof Option){
 			

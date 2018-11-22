@@ -9,14 +9,14 @@ import numpy
 from numpy.random import random_integers as rand
 import matplotlib.pyplot as pyplot
 
-def maze(width=30, height=30, complexity=.75, density=.75):
+def maze(width=30, height=30, complexity=.75, density=.25):
     # Only odd shapes
     shape = ((height // 2) * 2 + 1, (width // 2) * 2 + 1)
     # Adjust complexity and density relative to maze size
     complexity = int(complexity * (5 * (shape[0] + shape[1])))
     density    = int(density * ((shape[0] // 2) * (shape[1] // 2)))
     # Build actual maze
-    Z = numpy.zeros(shape, dtype=bool)
+    Z = numpy.zeros(shape, dtype=int)
     # Fill borders
     Z[0, :] = Z[-1, :] = 1
     Z[:, 0] = Z[:, -1] = 1
@@ -38,7 +38,17 @@ def maze(width=30, height=30, complexity=.75, density=.75):
                     x, y = x_, y_
     return Z
 
+Z=maze(20, 20,0.95,0.70)
+print Z
 pyplot.figure(figsize=(10, 5))
-pyplot.imshow(maze(32, 32,0.95,0.70), cmap=pyplot.cm.binary, interpolation='nearest')
+pyplot.imshow(Z, cmap=pyplot.cm.binary, interpolation='nearest')
+pyplot.xticks([]), pyplot.yticks([])
+pyplot.show()
+
+
+Z2=maze(10, 10,0.1,0.7)
+print Z2
+pyplot.figure(figsize=(10, 5))
+pyplot.imshow(Z2, cmap=pyplot.cm.binary, interpolation='nearest')
 pyplot.xticks([]), pyplot.yticks([])
 pyplot.show()

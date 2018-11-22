@@ -57,12 +57,16 @@ def dumpCSV(nIter, times,rewards,steps,convergence,world,method):
     
     
 def runEvals(initialState,plan,rewardL,stepL):
+    # usage: runEvals(initialState,p,rewards['Value'],steps['Value'])
     r = []
     s = []
     for trial in range(evalTrials):
         ea = plan.evaluateBehavior(initialState, rf, tf,200);
         r.append(calcRewardInEpisode(ea))
         s.append(ea.numTimeSteps())
+    print "runEvals priting:"
+    print "r=",r
+    print "s=",s
     rewardL.append(sum(r)/float(len(r)))
     stepL.append(sum(s)/float(len(s))) 
 
@@ -113,12 +117,10 @@ if __name__ == '__main__':
         for j in range(n):
             tmp[i][j]= userMap[i][j]
     userMap = MapPrinter().mapToMatrix(tmp)
+
     maxX = maxY= n-1
-
-
-    print maxX,maxY
     
-    gen = BasicGridWorld(userMap,maxX,maxY)
+    gen = BasicGridWorld(userMap,maxX,maxY)    # map, and size of map
     domain = gen.generateDomain()
     initialState = gen.getExampleState(domain);
 
@@ -130,102 +132,66 @@ if __name__ == '__main__':
     MapPrinter().printMap(MapPrinter.matrixToMap(userMap));
 
     hashingFactory = SimpleHashableStateFactory()
-    increment = MAX_ITERATIONS/NUM_INTERVALS
+    increment = MAX_ITERATIONS/NUM_INTERVALS   # =100/100=1
     timing = defaultdict(list)
     rewards = defaultdict(list)
     steps = defaultdict(list)
     convergence = defaultdict(list)
-    allStates = getAllStates(domain,rf,tf,initialState)
+    allStates = getAllStates(domain,rf,tf,initialState)    # agent: all possible locations agent can go; location: final target location
+    # print allStates
 
     # Value Iteration
     iterations = range(1,MAX_ITERATIONS+1)
-    vi = ValueIteration(domain,rf,tf,discount,hashingFactory,-1, 1);    
-    vi.setDebugCode(0) 
+    vi = ValueIteration(domain,rf,tf,discount,hashingFactory,-1, 1);
+    vi.setDebugCode(0)
     vi.performReachabilityFrom(initialState)
     vi.toggleUseCachedTransitionDynamics(False)
     print "//{} Value Iteration Analysis//".format(world)
-    timing['Value'].append(0)    
-    for nIter in iterations:      
-        startTime = clock()  
+    timing['Value'].append(0)
+    for nIter in iterations:  # from 1 to 100
+        startTime = clock()
         vi.runVI()
         timing['Value'].append(timing['Value'][-1]+clock()-startTime)
-        p = vi.planFromState(initialState);        
-        convergence['Value'].append(vi.latestDelta)           
+        p = vi.planFromState(initialState);
+        convergence['Value'].append(vi.latestDelta)
         # evaluate the policy with evalTrials roll outs
         runEvals(initialState,p,rewards['Value'],steps['Value'])
+        print "nIter=",nIter
+        print "rewards:"
+        print rewards
+        print "steps:"
+        print steps
         if nIter == 5 or vi.latestDelta < 1e-6:
-            simpleValueFunctionVis(vi, p, initialState, domain, hashingFactory, "Value Iteration {}".format(nIter))
             dumpPolicyMap(MapPrinter.printPolicyMap(allStates, p, gen.getMap()),'Value {} Iter {} Policy Map.pkl'.format(world,nIter))
         if vi.latestDelta <1e-6:
             break
-    print "\n\n\n"  
-    dumpCSV(nIter, timing['Value'][1:], rewards['Value'], steps['Value'],convergence['Value'], world, 'Value')
-      
-      
-   
-    pi = PolicyIteration(domain,rf,tf,discount,hashingFactory,1e-3,10, 1)  
-    pi.toggleUseCachedTransitionDynamics(False)   
-    print "//{} Policy Iteration Analysis//".format(world)
-    timing['Policy'].append(0)
-    for nIter in iterations:
-        startTime = clock()                         
-        p = pi.planFromState(initialState);
-        timing['Policy'].append(timing['Policy'][-1]+clock()-startTime)   
-        policy = pi.getComputedPolicy()    
-        current_policy = {state:policy.getAction(state).toString() for state in allStates} 
-        convergence['Policy2'].append(pi.lastPIDelta)
-        if nIter == 1:
-            convergence['Policy'].append(999)
-        else:
-            convergence['Policy'].append(comparePolicies(last_policy,current_policy))       
-        last_policy = current_policy                
-        runEvals(initialState,p,rewards['Policy'],steps['Policy'])
-        if nIter == 5 or convergence['Policy2'][-1] < 1e-6:
-            simpleValueFunctionVis(pi, p, initialState, domain, hashingFactory, "Policy Iteration {}".format(nIter))
-            dumpPolicyMap(MapPrinter.printPolicyMap(allStates, p, gen.getMap()),'Policy {} Iter {} Policy Map.pkl'.format(world,nIter))
-        if convergence['Policy2'][-1] <1e-6:
-            break
-    MapPrinter.printPolicyMap(pi.getAllStates(), p, gen.getMap());
+    MapPrinter.printPolicyMap(vi.getAllStates(), p, gen.getMap());
     print "\n\n\n"
-    dumpCSV(nIter, timing['Policy'][1:], rewards['Policy'], steps['Policy'],convergence['Policy2'], world, 'Policy')
-    #raise
-      
-    MAX_ITERATIONS=NUM_INTERVALS = MAX_ITERATIONS*10;
-    increment = MAX_ITERATIONS/NUM_INTERVALS
-    iterations = range(1,MAX_ITERATIONS+1)
-    for lr in [0.1,0.9]:
-        for qInit in [-100,0,100]:
-            for epsilon in [0.1,0.3,0.5]:
-                for episode in [300, 600, 1000]:
-                    last10Chg = deque([99] * 10, maxlen=10)
-                    Qname = 'Q-Learning L{:0.1f} q{:0.1f} E{:0.1f} EP{:0.1f}'.format(lr, qInit, epsilon, episode)
-                    # last10Chg = deque([99]*10,maxlen=10)
-                    # Qname = 'Q-Learning L{:0.1f} q{:0.1f} E{:0.1f}'.format(lr,qInit,epsilon)
-                    agent = QLearning(domain,discount,hashingFactory,qInit,lr,epsilon,episode)
-                    #agent.setLearningRateFunction(SoftTimeInverseDecayLR(1.,0.))
-                    agent.setDebugCode(0)
-                    print "//{} {} Iteration Analysis//".format(world,Qname)
-                    for nIter in iterations:
-                        if nIter % 50 == 0: print(nIter)
-                        startTime = clock()
-                        ea = agent.runLearningEpisode(env,300)
-                        if len(timing[Qname])> 0:
-                            timing[Qname].append(timing[Qname][-1]+clock()-startTime)
-                        else:
-                            timing[Qname].append(clock()-startTime)
-                        env.resetEnvironment()
-                        agent.initializeForPlanning(rf, tf, 1)
-                        p = agent.planFromState(initialState)     # run planning from our initial state
-                        last10Chg.append(agent.maxQChangeInLastEpisode)
-                        convergence[Qname].append(sum(last10Chg)/10.)
-                        # evaluate the policy with one roll out visualize the trajectory
-                        runEvals(initialState,p,rewards[Qname],steps[Qname])
-                        if nIter == 50 :
-                            dumpPolicyMap(MapPrinter.printPolicyMap(allStates, p, gen.getMap()),'QL {} {} Iter {} Policy Map.pkl'.format(Qname,world,nIter))
-                        if convergence[Qname][-1] <0.5:
-                            if (lr==0.1 and qInit==-100 and epsilon==0.5 and episode==1000):
-                                simpleValueFunctionVis(agent, p, initialState, domain, hashingFactory, "Qlearning Iteration {}".format(nIter))
-                            dumpPolicyMap(MapPrinter.printPolicyMap(allStates, p, gen.getMap()),'QL {} {} Iter {} Policy Map.pkl'.format(Qname,world,nIter));break
-                    print "\n\n\n"
-                    dumpCSV(nIter, timing[Qname], rewards[Qname], steps[Qname],convergence[Qname], world, Qname)
-     
+    dumpCSV(nIter, timing['Value'][1:], rewards['Value'], steps['Value'],convergence['Value'], world, 'Value')
+    #
+    # pi = PolicyIteration(domain, rf, tf, discount, hashingFactory, 1e-3, 10, 1)
+    # pi.toggleUseCachedTransitionDynamics(False)
+    # print "//{} Policy Iteration Analysis//".format(world)
+    # timing['Policy'].append(0)
+    # for nIter in iterations:
+    #     startTime = clock()
+    #     p = pi.planFromState(initialState);
+    #     timing['Policy'].append(timing['Policy'][-1] + clock() - startTime)
+    #     policy = pi.getComputedPolicy()
+    #     current_policy = {state: policy.getAction(state).toString() for state in allStates}
+    #     convergence['Policy2'].append(pi.lastPIDelta)
+    #     if nIter == 1:
+    #         convergence['Policy'].append(999)
+    #     else:
+    #         convergence['Policy'].append(comparePolicies(last_policy, current_policy))
+    #     last_policy = current_policy
+    #     runEvals(initialState, p, rewards['Policy'], steps['Policy'])
+    #     if nIter == 5 or convergence['Policy2'][-1] < 1e-6:
+    #         simpleValueFunctionVis(pi, p, initialState, domain, hashingFactory, "Policy Iteration {}".format(nIter))
+    #         dumpPolicyMap(MapPrinter.printPolicyMap(allStates, p, gen.getMap()),
+    #                       'Policy {} Iter {} Policy Map.pkl'.format(world, nIter))
+    #     if convergence['Policy2'][-1] < 1e-6:
+    #         break
+    # MapPrinter.printPolicyMap(pi.getAllStates(), p, gen.getMap());
+    # print "\n\n\n"
+    # dumpCSV(nIter, timing['Policy'][1:], rewards['Policy'], steps['Policy'], convergence['Policy2'], world, 'Policy')
